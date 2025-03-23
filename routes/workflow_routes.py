@@ -139,3 +139,28 @@ def get_workflow(workflow_id):
         "start_day": workflow.start_day.value,  # Convert enum to string
         "end_day": workflow.end_day.value  # Convert enum to string
     })
+
+# 🔹 Delete a Workflow Step
+@workflow_routes.route("/workflows/<int:workflow_id>/steps/<int:step_id>", methods=["DELETE"])
+def delete_workflow_step(workflow_id, step_id):
+    step = db.query(WorkflowSteps).filter_by(id=step_id, workflow_id=workflow_id).first()
+    if not step:
+        return jsonify({"message": "Step not found"}), 404
+
+    step_order_to_remove = step.step_order
+
+    db.delete(step)
+    db.commit()
+
+    # Reorder the remaining steps
+    remaining_steps = db.query(WorkflowSteps).filter(
+        WorkflowSteps.workflow_id == workflow_id,
+        WorkflowSteps.step_order > step_order_to_remove
+    ).order_by(WorkflowSteps.step_order.asc()).all()
+
+    for s in remaining_steps:
+        s.step_order -= 1
+
+    db.commit()
+
+    return jsonify({"message": "Step deleted and steps reordered"}), 200
